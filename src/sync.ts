@@ -14,22 +14,48 @@ export class BlinkoSync {
     }
   }
 
+  private extractTitle(content: string): string {
+    const firstLine = content.split('\n')[0].replace(/^#+\s*/, '').trim();
+    const sanitized = firstLine.replace(/[\\/:*?"<>|]/g, '').substring(0, 50);
+    return sanitized || 'Untitled';
+  }
+
+  private async findExistingFile(id: number): Promise<TFile | null> {
+    const folderPath = normalizePath(this.syncFolder);
+    const folder = this.app.vault.getAbstractFileByPath(folderPath);
+    if (folder && folder instanceof TFolder) {
+      for (const file of folder.children) {
+        if (file instanceof TFile && file.extension === 'md') {
+          if (file.name === `${id}.md` || file.name.startsWith(`${id}-`)) {
+            return file;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   async syncNote(note: BlinkoNote) {
     if (!this.syncFolder || !this.syncFolder.trim()) return;
     
     try {
       await this.ensureFolderExists(this.syncFolder);
       
-      const fileName = `${note.id}.md`;
-      const filePath = normalizePath(`${this.syncFolder}/${fileName}`);
-      const file = this.app.vault.getAbstractFileByPath(filePath);
+      const title = this.extractTitle(note.content);
+      const newFileName = `${note.id}-${title}.md`;
+      const newFilePath = normalizePath(`${this.syncFolder}/${newFileName}`);
       
-      const content = `---\nid: ${note.id}\ncreated: ${note.createdAt || new Date().toISOString()}\n---\n\n${note.content}`;
+      const contentStr = `---\nid: ${note.id}\ncreated: ${note.createdAt || new Date().toISOString()}\n---\n\n${note.content}`;
 
-      if (file && file instanceof TFile) {
-        await this.app.vault.modify(file, content);
+      const existingFile = await this.findExistingFile(note.id);
+
+      if (existingFile) {
+        await this.app.vault.modify(existingFile, contentStr);
+        if (existingFile.path !== newFilePath) {
+          await this.app.fileManager.renameFile(existingFile, newFilePath);
+        }
       } else {
-        await this.app.vault.create(filePath, content);
+        await this.app.vault.create(newFilePath, contentStr);
       }
     } catch(e) {
       console.error("Local sync error:", e);
@@ -38,13 +64,13 @@ export class BlinkoSync {
 
   async deleteSyncedNote(id: number) {
     if (!this.syncFolder || !this.syncFolder.trim()) return;
-    
-    const fileName = `${id}.md`;
-    const filePath = normalizePath(`${this.syncFolder}/${fileName}`);
-    const file = this.app.vault.getAbstractFileByPath(filePath);
-    
-    if (file && file instanceof TFile) {
-      await this.app.vault.delete(file);
+    try {
+      const existingFile = await this.findExistingFile(id);
+      if (existingFile) {
+        await this.app.vault.delete(existingFile);
+      }
+    } catch(e) {
+      console.error("Local delete error:", e);
     }
   }
 }

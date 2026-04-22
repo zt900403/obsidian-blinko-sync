@@ -96,7 +96,16 @@
 .blinko-heatmap-cell:nth-child(13n-1):hover::after,
 .blinko-heatmap-cell:nth-child(13n-2):hover::after {
   left: auto;
-  right: 0;
+  right: -5px;
+  transform: none;
+}
+
+/* Prevent tooltip from overflowing the sidebar on the left edges */
+.blinko-heatmap-cell:nth-child(13n+1):hover::after,
+.blinko-heatmap-cell:nth-child(13n+2):hover::after,
+.blinko-heatmap-cell:nth-child(13n+3):hover::after {
+  left: -5px;
+  right: auto;
   transform: none;
 }
 

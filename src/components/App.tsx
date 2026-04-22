@@ -147,12 +147,6 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
             </div>
           )}
 
-          <div className="blinko-view-title">
-            {filterMode === 'daily_review' && <h2>每日回顾</h2>}
-            {filterMode === 'random_walk' && <h2>随机漫步</h2>}
-            {selectedTag && <h2>#{selectedTag}</h2>}
-          </div>
-
           {(filterMode === 'daily_review' || filterMode === 'random_walk') ? (
             <CarouselContent 
               plugin={plugin} 

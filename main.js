@@ -23711,24 +23711,47 @@ var BlinkoSync = class {
       throw new Error(`Path ${normalizedPath} exists but is not a folder.`);
     }
   }
+  extractTitle(content) {
+    const firstLine = content.split("\n")[0].replace(/^#+\s*/, "").trim();
+    const sanitized = firstLine.replace(/[\\/:*?"<>|]/g, "").substring(0, 50);
+    return sanitized || "Untitled";
+  }
+  async findExistingFile(id) {
+    const folderPath = (0, import_obsidian3.normalizePath)(this.syncFolder);
+    const folder = this.app.vault.getAbstractFileByPath(folderPath);
+    if (folder && folder instanceof import_obsidian3.TFolder) {
+      for (const file of folder.children) {
+        if (file instanceof import_obsidian3.TFile && file.extension === "md") {
+          if (file.name === `${id}.md` || file.name.startsWith(`${id}-`)) {
+            return file;
+          }
+        }
+      }
+    }
+    return null;
+  }
   async syncNote(note) {
     if (!this.syncFolder || !this.syncFolder.trim())
       return;
     try {
       await this.ensureFolderExists(this.syncFolder);
-      const fileName = `${note.id}.md`;
-      const filePath = (0, import_obsidian3.normalizePath)(`${this.syncFolder}/${fileName}`);
-      const file = this.app.vault.getAbstractFileByPath(filePath);
-      const content = `---
+      const title = this.extractTitle(note.content);
+      const newFileName = `${note.id}-${title}.md`;
+      const newFilePath = (0, import_obsidian3.normalizePath)(`${this.syncFolder}/${newFileName}`);
+      const contentStr = `---
 id: ${note.id}
 created: ${note.createdAt || new Date().toISOString()}
 ---
 
 ${note.content}`;
-      if (file && file instanceof import_obsidian3.TFile) {
-        await this.app.vault.modify(file, content);
+      const existingFile = await this.findExistingFile(note.id);
+      if (existingFile) {
+        await this.app.vault.modify(existingFile, contentStr);
+        if (existingFile.path !== newFilePath) {
+          await this.app.fileManager.renameFile(existingFile, newFilePath);
+        }
       } else {
-        await this.app.vault.create(filePath, content);
+        await this.app.vault.create(newFilePath, contentStr);
       }
     } catch (e) {
       console.error("Local sync error:", e);
@@ -23737,11 +23760,13 @@ ${note.content}`;
   async deleteSyncedNote(id) {
     if (!this.syncFolder || !this.syncFolder.trim())
       return;
-    const fileName = `${id}.md`;
-    const filePath = (0, import_obsidian3.normalizePath)(`${this.syncFolder}/${fileName}`);
-    const file = this.app.vault.getAbstractFileByPath(filePath);
-    if (file && file instanceof import_obsidian3.TFile) {
-      await this.app.vault.delete(file);
+    try {
+      const existingFile = await this.findExistingFile(id);
+      if (existingFile) {
+        await this.app.vault.delete(existingFile);
+      }
+    } catch (e) {
+      console.error("Local delete error:", e);
     }
   }
 };
@@ -24474,7 +24499,7 @@ var App3 = ({ plugin }) => {
       value: searchQuery,
       onChange: (e) => setSearchQuery(e.target.value)
     }
-  ), /* @__PURE__ */ React6.createElement(Search, { size: 14, className: "blinko-search-icon" })))), error && /* @__PURE__ */ React6.createElement("div", { className: "blinko-error-banner" }, error), filterMode === "all" && !selectedTag && !searchQuery && /* @__PURE__ */ React6.createElement("div", { className: "blinko-input-section" }, /* @__PURE__ */ React6.createElement(NoteInput, { plugin, onSubmit: handleCreateNote })), /* @__PURE__ */ React6.createElement("div", { className: "blinko-view-title" }, filterMode === "daily_review" && /* @__PURE__ */ React6.createElement("h2", null, "\u6BCF\u65E5\u56DE\u987E"), filterMode === "random_walk" && /* @__PURE__ */ React6.createElement("h2", null, "\u968F\u673A\u6F2B\u6B65"), selectedTag && /* @__PURE__ */ React6.createElement("h2", null, "#", selectedTag)), filterMode === "daily_review" || filterMode === "random_walk" ? /* @__PURE__ */ React6.createElement(
+  ), /* @__PURE__ */ React6.createElement(Search, { size: 14, className: "blinko-search-icon" })))), error && /* @__PURE__ */ React6.createElement("div", { className: "blinko-error-banner" }, error), filterMode === "all" && !selectedTag && !searchQuery && /* @__PURE__ */ React6.createElement("div", { className: "blinko-input-section" }, /* @__PURE__ */ React6.createElement(NoteInput, { plugin, onSubmit: handleCreateNote })), filterMode === "daily_review" || filterMode === "random_walk" ? /* @__PURE__ */ React6.createElement(
     CarouselContent,
     {
       plugin,
