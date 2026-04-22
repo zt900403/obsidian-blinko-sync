@@ -64,11 +64,46 @@ export default class BlinkoSyncPlugin extends Plugin {
     }
   }
 
+  private obfuscate(text: string): string {
+    if (!text || text.startsWith('ENC:')) return text;
+    try {
+      const buffer = Buffer.from(text, 'utf-8');
+      for (let i = 0; i < buffer.length; i++) {
+        buffer[i] ^= 0x5B; // Simple XOR
+      }
+      return 'ENC:' + buffer.toString('base64');
+    } catch (e) {
+      return text;
+    }
+  }
+
+  private deobfuscate(text: string): string {
+    if (!text || !text.startsWith('ENC:')) return text;
+    try {
+      const b64 = text.replace('ENC:', '');
+      const buffer = Buffer.from(b64, 'base64');
+      for (let i = 0; i < buffer.length; i++) {
+        buffer[i] ^= 0x5B;
+      }
+      return buffer.toString('utf-8');
+    } catch (e) {
+      return text;
+    }
+  }
+
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = await this.loadData();
+    if (data && data.blinkoToken) {
+      data.blinkoToken = this.deobfuscate(data.blinkoToken);
+    }
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
   }
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    const dataToSave = { ...this.settings };
+    if (dataToSave.blinkoToken) {
+      dataToSave.blinkoToken = this.obfuscate(dataToSave.blinkoToken);
+    }
+    await this.saveData(dataToSave);
   }
 }

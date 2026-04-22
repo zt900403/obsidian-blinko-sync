@@ -52,14 +52,17 @@ export class BlinkoSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Blinko API Token')
-      .setDesc('Your Bearer token for authentication.')
-      .addText(text => text
-        .setPlaceholder('Enter token')
-        .setValue(this.plugin.settings.blinkoToken)
-        .onChange(async (value) => {
-          this.plugin.settings.blinkoToken = value;
-          await this.plugin.saveSettings();
-        }));
+      .setDesc('Your Bearer token for authentication. It is masked here and obfuscated in the configuration file.')
+      .addText(text => {
+        text.inputEl.type = 'password';
+        text
+          .setPlaceholder('Enter token')
+          .setValue(this.plugin.settings.blinkoToken)
+          .onChange(async (value) => {
+            this.plugin.settings.blinkoToken = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName('Local Sync Folder')

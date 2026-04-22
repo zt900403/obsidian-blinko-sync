@@ -23594,10 +23594,13 @@ var BlinkoSettingTab = class extends import_obsidian.PluginSettingTab {
       this.plugin.settings.blinkoUrl = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Blinko API Token").setDesc("Your Bearer token for authentication.").addText((text) => text.setPlaceholder("Enter token").setValue(this.plugin.settings.blinkoToken).onChange(async (value) => {
-      this.plugin.settings.blinkoToken = value;
-      await this.plugin.saveSettings();
-    }));
+    new import_obsidian.Setting(containerEl).setName("Blinko API Token").setDesc("Your Bearer token for authentication. It is masked here and obfuscated in the configuration file.").addText((text) => {
+      text.inputEl.type = "password";
+      text.setPlaceholder("Enter token").setValue(this.plugin.settings.blinkoToken).onChange(async (value) => {
+        this.plugin.settings.blinkoToken = value;
+        await this.plugin.saveSettings();
+      });
+    });
     new import_obsidian.Setting(containerEl).setName("Local Sync Folder").setDesc("The folder in your Obsidian vault where notes will be synced.").addText((text) => text.setPlaceholder("Blinko Notes").setValue(this.plugin.settings.syncFolder).onChange(async (value) => {
       this.plugin.settings.syncFolder = value;
       await this.plugin.saveSettings();
@@ -24731,11 +24734,46 @@ var BlinkoSyncPlugin = class extends import_obsidian7.Plugin {
       workspace.revealLeaf(leaf);
     }
   }
+  obfuscate(text) {
+    if (!text || text.startsWith("ENC:"))
+      return text;
+    try {
+      const buffer = Buffer.from(text, "utf-8");
+      for (let i = 0; i < buffer.length; i++) {
+        buffer[i] ^= 91;
+      }
+      return "ENC:" + buffer.toString("base64");
+    } catch (e) {
+      return text;
+    }
+  }
+  deobfuscate(text) {
+    if (!text || !text.startsWith("ENC:"))
+      return text;
+    try {
+      const b64 = text.replace("ENC:", "");
+      const buffer = Buffer.from(b64, "base64");
+      for (let i = 0; i < buffer.length; i++) {
+        buffer[i] ^= 91;
+      }
+      return buffer.toString("utf-8");
+    } catch (e) {
+      return text;
+    }
+  }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = await this.loadData();
+    if (data && data.blinkoToken) {
+      data.blinkoToken = this.deobfuscate(data.blinkoToken);
+    }
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
   }
   async saveSettings() {
-    await this.saveData(this.settings);
+    const dataToSave = { ...this.settings };
+    if (dataToSave.blinkoToken) {
+      dataToSave.blinkoToken = this.obfuscate(dataToSave.blinkoToken);
+    }
+    await this.saveData(dataToSave);
   }
 };
 /*! Bundled license information:
