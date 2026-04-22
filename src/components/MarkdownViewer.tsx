@@ -15,10 +15,16 @@ export const MarkdownViewer: React.FC<Props> = ({ content, plugin }) => {
     if (containerRef.current) {
       containerRef.current.empty();
       const comp = new Component();
+      
+      const baseUrl = plugin.settings.blinkoUrl.replace(/\/+$/, '');
+      const modifiedContent = content
+        .replace(/\]\(\/api\/file\//g, `](${baseUrl}/api/file/`)
+        .replace(/src="\/api\/file\//g, `src="${baseUrl}/api/file/`);
+
       // Use Obsidian's built-in markdown renderer for native support of tags, images, links
       MarkdownRenderer.render(
         plugin.app,
-        content,
+        modifiedContent,
         containerRef.current,
         '',
         comp
