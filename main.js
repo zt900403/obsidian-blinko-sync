@@ -24012,6 +24012,8 @@ var NoteInput = ({ plugin, onSubmit }) => {
   const handleKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
       handleSubmit();
     }
   };
@@ -24495,7 +24497,7 @@ var App3 = ({ plugin }) => {
     {
       type: "text",
       className: "blinko-search-input",
-      placeholder: "\u641C\u7D22...",
+      placeholder: "\u641C\u7D22... (\u8BBE\u7F6E\u5168\u5C40\u5FEB\u6377\u952E\u805A\u7126)",
       value: searchQuery,
       onChange: (e) => setSearchQuery(e.target.value)
     }
@@ -24566,6 +24568,20 @@ var BlinkoSyncPlugin = class extends import_obsidian6.Plugin {
       name: "Open Blinko Sync View",
       callback: () => {
         this.activateView();
+      }
+    });
+    this.addCommand({
+      id: "search-blinko-sync",
+      name: "Search Blinko Sync",
+      callback: async () => {
+        await this.activateView();
+        setTimeout(() => {
+          const searchInput = document.querySelector(".blinko-search-input");
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
+        }, 100);
       }
     });
     this.addSettingTab(new BlinkoSettingTab(this.app, this));

@@ -25,6 +25,21 @@ export default class BlinkoSyncPlugin extends Plugin {
       }
     });
 
+    this.addCommand({
+      id: 'search-blinko-sync',
+      name: 'Search Blinko Sync',
+      callback: async () => {
+        await this.activateView();
+        setTimeout(() => {
+          const searchInput = document.querySelector('.blinko-search-input') as HTMLInputElement | null;
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
+        }, 100);
+      }
+    });
+
     this.addSettingTab(new BlinkoSettingTab(this.app, this));
   }
 

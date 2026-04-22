@@ -130,7 +130,7 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
                 <input 
                   type="text" 
                   className="blinko-search-input" 
-                  placeholder="搜索..."
+                  placeholder="搜索... (设置全局快捷键聚焦)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />

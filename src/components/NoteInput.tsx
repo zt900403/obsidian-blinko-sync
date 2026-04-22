@@ -25,6 +25,8 @@ export const NoteInput: React.FC<NoteInputProps> = ({ plugin, onSubmit }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
       handleSubmit();
     }
   };
