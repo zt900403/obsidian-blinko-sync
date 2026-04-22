@@ -7,7 +7,8 @@ import { NoteInput } from './NoteInput';
 import { Sidebar } from './Sidebar';
 import { MainContent } from './MainContent';
 import { CarouselContent } from './CarouselContent';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, RefreshCw } from 'lucide-react';
+import { Notice } from 'obsidian';
 
 interface AppProps {
   plugin: BlinkoSyncPlugin;
@@ -41,6 +42,24 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
       if (showLoading) setLoading(false);
     }
   }, [plugin]);
+
+  const forceSyncNotes = async () => {
+    const api = new BlinkoAPI(plugin.settings);
+    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    setLoading(true);
+    setError(null);
+    new Notice('开始双向同步 (Fetching all notes...)');
+    try {
+      const allNotes = await api.fetchAllNotes();
+      setNotes(allNotes);
+      await sync.forceSync(allNotes);
+      new Notice(`全量同步完成！共同步 ${allNotes.length} 条笔记`);
+    } catch(err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadNotes();
@@ -125,7 +144,17 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
         <div className="blinko-scrollable-content">
           <div className="blinko-topbar">
             <div className="blinko-topbar-inner">
-              <div className="blinko-title-dropdown">{getTitle()}</div>
+              <div className="blinko-title-dropdown">
+                {getTitle()}
+                <button 
+                  className="blinko-action-icon" 
+                  style={{marginLeft: '12px'}} 
+                  title="强制云端全量双向同步" 
+                  onClick={forceSyncNotes}
+                >
+                  <RefreshCw size={14} className={loading ? "blinko-spin" : ""} />
+                </button>
+              </div>
               <div className="blinko-search-wrapper">
                 <input 
                   type="text" 

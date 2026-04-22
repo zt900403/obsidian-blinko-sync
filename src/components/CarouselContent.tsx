@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BlinkoNote } from '../api';
 import BlinkoSyncPlugin from '../main';
 import { MarkdownViewer } from './MarkdownViewer';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, Trash2 } from 'lucide-react';
 
 interface Props {
   plugin: BlinkoSyncPlugin;
@@ -14,6 +14,18 @@ interface Props {
 
 export const CarouselContent: React.FC<Props> = ({ plugin, notes, onDelete, title }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (notes.length === 0) {
     return (
@@ -35,10 +47,12 @@ export const CarouselContent: React.FC<Props> = ({ plugin, notes, onDelete, titl
   };
 
   const handlePrev = () => {
+    setMenuOpen(false);
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : notes.length - 1));
   };
 
   const handleNext = () => {
+    setMenuOpen(false);
     setCurrentIndex((prev) => (prev < notes.length - 1 ? prev + 1 : 0));
   };
 
@@ -50,18 +64,29 @@ export const CarouselContent: React.FC<Props> = ({ plugin, notes, onDelete, titl
         <div className="blinko-note-header-flomo">
           <div className="blinko-note-time-flomo">{formatDateTime(currentNote.createdAt)}</div>
           <div className="blinko-dropdown-container">
-            <button className="blinko-action-icon">
+            <button 
+              className={`blinko-action-icon ${menuOpen ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(!menuOpen);
+              }}
+            >
               <MoreHorizontal size={16} />
             </button>
-            <div className="blinko-dropdown-menu">
-              <button className="delete-btn" onClick={() => {
-                if(confirm('确认删除这条笔记吗？')) {
-                  onDelete(currentNote.id);
-                  if (notes.length === 1) setCurrentIndex(0);
-                  else if (currentIndex === notes.length - 1) setCurrentIndex(currentIndex - 1);
-                }
-              }}>删除</button>
-            </div>
+            {menuOpen && (
+              <div className="blinko-dropdown-menu show" ref={menuRef}>
+                <button className="delete-btn" onClick={() => {
+                  if(confirm('确认删除这条笔记吗？')) {
+                    onDelete(currentNote.id);
+                    if (notes.length === 1) setCurrentIndex(0);
+                    else if (currentIndex === notes.length - 1) setCurrentIndex(currentIndex - 1);
+                  }
+                  setMenuOpen(false);
+                }}>
+                  <Trash2 size={14} style={{marginRight: '8px'}} /> 删除
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div className="blinko-note-body-flomo">

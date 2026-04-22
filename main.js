@@ -1101,11 +1101,11 @@ var require_react_development = __commonJS({
           var dispatcher = resolveDispatcher();
           return dispatcher.useReducer(reducer, initialArg, init);
         }
-        function useRef4(initialValue) {
+        function useRef5(initialValue) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useRef(initialValue);
         }
-        function useEffect5(create, deps) {
+        function useEffect6(create, deps) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useEffect(create, deps);
         }
@@ -1888,14 +1888,14 @@ var require_react_development = __commonJS({
         exports.useContext = useContext;
         exports.useDebugValue = useDebugValue;
         exports.useDeferredValue = useDeferredValue;
-        exports.useEffect = useEffect5;
+        exports.useEffect = useEffect6;
         exports.useId = useId;
         exports.useImperativeHandle = useImperativeHandle;
         exports.useInsertionEffect = useInsertionEffect;
         exports.useLayoutEffect = useLayoutEffect;
         exports.useMemo = useMemo3;
         exports.useReducer = useReducer;
-        exports.useRef = useRef4;
+        exports.useRef = useRef5;
         exports.useState = useState6;
         exports.useSyncExternalStore = useSyncExternalStore;
         exports.useTransition = useTransition;
@@ -23567,7 +23567,7 @@ __export(main_exports, {
   default: () => BlinkoSyncPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
@@ -23606,7 +23606,7 @@ var BlinkoSettingTab = class extends import_obsidian.PluginSettingTab {
 };
 
 // src/view.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 var React7 = __toESM(require_react());
 var ReactDOM = __toESM(require_client());
 
@@ -23654,6 +23654,42 @@ var BlinkoAPI = class {
         return data.items;
       }
       return [];
+    } catch (e) {
+      throw new Error(`Fetch Error: ${e.message}`);
+    }
+  }
+  async fetchAllNotes() {
+    if (!this.settings.blinkoUrl || !this.settings.blinkoToken) {
+      throw new Error("Please configure Blinko API URL and Token in settings.");
+    }
+    let allNotes = [];
+    let page = 1;
+    const size = 500;
+    try {
+      while (true) {
+        const response = await (0, import_obsidian2.requestUrl)({
+          url: `${this.getBaseUrl()}/api/v1/note/list`,
+          method: "POST",
+          headers: this.getHeaders(),
+          body: JSON.stringify({ page, size, orderBy: "desc" })
+        });
+        if (response.status >= 400) {
+          throw new Error(`Failed to fetch notes: ${response.status}`);
+        }
+        const data = response.json;
+        let items = [];
+        if (Array.isArray(data)) {
+          items = data;
+        } else if (data && Array.isArray(data.items)) {
+          items = data.items;
+        }
+        allNotes = [...allNotes, ...items];
+        if (items.length < size) {
+          break;
+        }
+        page++;
+      }
+      return allNotes;
     } catch (e) {
       throw new Error(`Fetch Error: ${e.message}`);
     }
@@ -23755,6 +23791,34 @@ ${note.content}`;
       }
     } catch (e) {
       console.error("Local sync error:", e);
+    }
+  }
+  async forceSync(allNotes) {
+    if (!this.syncFolder || !this.syncFolder.trim())
+      return;
+    try {
+      await this.ensureFolderExists(this.syncFolder);
+      const folderPath = (0, import_obsidian3.normalizePath)(this.syncFolder);
+      const folder = this.app.vault.getAbstractFileByPath(folderPath);
+      if (folder && folder instanceof import_obsidian3.TFolder) {
+        const validIds = new Set(allNotes.map((n) => n.id));
+        for (const file of folder.children) {
+          if (file instanceof import_obsidian3.TFile && file.extension === "md") {
+            const match = file.name.match(/^(\d+)(?:-|\.md$)/);
+            if (match) {
+              const fileId = parseInt(match[1], 10);
+              if (!validIds.has(fileId)) {
+                await this.app.vault.delete(file);
+              }
+            }
+          }
+        }
+      }
+      for (const note of allNotes) {
+        await this.syncNote(note);
+      }
+    } catch (e) {
+      console.error("Force sync error:", e);
     }
   }
   async deleteSyncedNote(id) {
@@ -23943,6 +24007,20 @@ var MoreHorizontal = createLucideIcon("MoreHorizontal", [
   ["circle", { cx: "12", cy: "12", r: "1", key: "41hilf" }],
   ["circle", { cx: "19", cy: "12", r: "1", key: "1wjl8i" }],
   ["circle", { cx: "5", cy: "12", r: "1", key: "1pcz8c" }]
+]);
+
+// node_modules/lucide-react/dist/esm/icons/refresh-cw.js
+var RefreshCw = createLucideIcon("RefreshCw", [
+  [
+    "path",
+    { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", key: "v9h5vc" }
+  ],
+  ["path", { d: "M21 3v5h-5", key: "1q7to0" }],
+  [
+    "path",
+    { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", key: "3uifl3" }
+  ],
+  ["path", { d: "M8 16H3v5", key: "1cv678" }]
 ]);
 
 // node_modules/lucide-react/dist/esm/icons/search.js
@@ -24353,6 +24431,17 @@ var React5 = __toESM(require_react());
 var import_react6 = __toESM(require_react());
 var CarouselContent = ({ plugin, notes, onDelete, title }) => {
   const [currentIndex, setCurrentIndex] = (0, import_react6.useState)(0);
+  const [menuOpen, setMenuOpen] = (0, import_react6.useState)(false);
+  const menuRef = (0, import_react6.useRef)(null);
+  (0, import_react6.useEffect)(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   if (notes.length === 0) {
     return /* @__PURE__ */ React5.createElement("div", { className: "blinko-empty-state" }, title === "\u6BCF\u65E5\u56DE\u987E" ? "\u4ECA\u5929\u8FD8\u6CA1\u6709\u8BB0\u5F55\u7B14\u8BB0\u54E6\u3002" : "\u6CA1\u6709\u627E\u5230\u53EF\u4EE5\u6F2B\u6B65\u7684\u7B14\u8BB0\u3002");
   }
@@ -24368,13 +24457,25 @@ var CarouselContent = ({ plugin, notes, onDelete, title }) => {
     return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
   };
   const handlePrev = () => {
+    setMenuOpen(false);
     setCurrentIndex((prev) => prev > 0 ? prev - 1 : notes.length - 1);
   };
   const handleNext = () => {
+    setMenuOpen(false);
     setCurrentIndex((prev) => prev < notes.length - 1 ? prev + 1 : 0);
   };
   const currentNote = notes[currentIndex];
-  return /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-wrapper" }, /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-card" }, /* @__PURE__ */ React5.createElement("div", { className: "blinko-note-header-flomo" }, /* @__PURE__ */ React5.createElement("div", { className: "blinko-note-time-flomo" }, formatDateTime(currentNote.createdAt)), /* @__PURE__ */ React5.createElement("div", { className: "blinko-dropdown-container" }, /* @__PURE__ */ React5.createElement("button", { className: "blinko-action-icon" }, /* @__PURE__ */ React5.createElement(MoreHorizontal, { size: 16 })), /* @__PURE__ */ React5.createElement("div", { className: "blinko-dropdown-menu" }, /* @__PURE__ */ React5.createElement("button", { className: "delete-btn", onClick: () => {
+  return /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-wrapper" }, /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-card" }, /* @__PURE__ */ React5.createElement("div", { className: "blinko-note-header-flomo" }, /* @__PURE__ */ React5.createElement("div", { className: "blinko-note-time-flomo" }, formatDateTime(currentNote.createdAt)), /* @__PURE__ */ React5.createElement("div", { className: "blinko-dropdown-container" }, /* @__PURE__ */ React5.createElement(
+    "button",
+    {
+      className: `blinko-action-icon ${menuOpen ? "active" : ""}`,
+      onClick: (e) => {
+        e.stopPropagation();
+        setMenuOpen(!menuOpen);
+      }
+    },
+    /* @__PURE__ */ React5.createElement(MoreHorizontal, { size: 16 })
+  ), menuOpen && /* @__PURE__ */ React5.createElement("div", { className: "blinko-dropdown-menu show", ref: menuRef }, /* @__PURE__ */ React5.createElement("button", { className: "delete-btn", onClick: () => {
     if (confirm("\u786E\u8BA4\u5220\u9664\u8FD9\u6761\u7B14\u8BB0\u5417\uFF1F")) {
       onDelete(currentNote.id);
       if (notes.length === 1)
@@ -24382,10 +24483,12 @@ var CarouselContent = ({ plugin, notes, onDelete, title }) => {
       else if (currentIndex === notes.length - 1)
         setCurrentIndex(currentIndex - 1);
     }
-  } }, "\u5220\u9664")))), /* @__PURE__ */ React5.createElement("div", { className: "blinko-note-body-flomo" }, /* @__PURE__ */ React5.createElement(MarkdownViewer, { content: currentNote.content, plugin }))), /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-controls" }, /* @__PURE__ */ React5.createElement("button", { className: "blinko-carousel-btn", onClick: handlePrev }, /* @__PURE__ */ React5.createElement(ChevronLeft, { size: 20 })), /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-indicator" }, currentIndex + 1, " / ", notes.length), /* @__PURE__ */ React5.createElement("button", { className: "blinko-carousel-btn", onClick: handleNext }, /* @__PURE__ */ React5.createElement(ChevronRight, { size: 20 }))));
+    setMenuOpen(false);
+  } }, /* @__PURE__ */ React5.createElement(Trash2, { size: 14, style: { marginRight: "8px" } }), " \u5220\u9664")))), /* @__PURE__ */ React5.createElement("div", { className: "blinko-note-body-flomo" }, /* @__PURE__ */ React5.createElement(MarkdownViewer, { content: currentNote.content, plugin }))), /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-controls" }, /* @__PURE__ */ React5.createElement("button", { className: "blinko-carousel-btn", onClick: handlePrev }, /* @__PURE__ */ React5.createElement(ChevronLeft, { size: 20 })), /* @__PURE__ */ React5.createElement("div", { className: "blinko-carousel-indicator" }, currentIndex + 1, " / ", notes.length), /* @__PURE__ */ React5.createElement("button", { className: "blinko-carousel-btn", onClick: handleNext }, /* @__PURE__ */ React5.createElement(ChevronRight, { size: 20 }))));
 };
 
 // src/components/App.tsx
+var import_obsidian5 = require("obsidian");
 var App3 = ({ plugin }) => {
   const [notes, setNotes] = (0, import_react7.useState)([]);
   const [loading, setLoading] = (0, import_react7.useState)(false);
@@ -24413,6 +24516,23 @@ var App3 = ({ plugin }) => {
         setLoading(false);
     }
   }, [plugin]);
+  const forceSyncNotes = async () => {
+    const api = new BlinkoAPI(plugin.settings);
+    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    setLoading(true);
+    setError(null);
+    new import_obsidian5.Notice("\u5F00\u59CB\u53CC\u5411\u540C\u6B65 (Fetching all notes...)");
+    try {
+      const allNotes = await api.fetchAllNotes();
+      setNotes(allNotes);
+      await sync.forceSync(allNotes);
+      new import_obsidian5.Notice(`\u5168\u91CF\u540C\u6B65\u5B8C\u6210\uFF01\u5171\u540C\u6B65 ${allNotes.length} \u6761\u7B14\u8BB0`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
   (0, import_react7.useEffect)(() => {
     loadNotes();
     const interval = setInterval(() => {
@@ -24492,7 +24612,16 @@ var App3 = ({ plugin }) => {
       setSelectedTag,
       username: plugin.settings.username || "Blinko"
     }
-  ), /* @__PURE__ */ React6.createElement("div", { className: "blinko-main-area" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-scrollable-content" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-topbar" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-topbar-inner" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-title-dropdown" }, getTitle()), /* @__PURE__ */ React6.createElement("div", { className: "blinko-search-wrapper" }, /* @__PURE__ */ React6.createElement(
+  ), /* @__PURE__ */ React6.createElement("div", { className: "blinko-main-area" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-scrollable-content" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-topbar" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-topbar-inner" }, /* @__PURE__ */ React6.createElement("div", { className: "blinko-title-dropdown" }, getTitle(), /* @__PURE__ */ React6.createElement(
+    "button",
+    {
+      className: "blinko-action-icon",
+      style: { marginLeft: "12px" },
+      title: "\u5F3A\u5236\u4E91\u7AEF\u5168\u91CF\u53CC\u5411\u540C\u6B65",
+      onClick: forceSyncNotes
+    },
+    /* @__PURE__ */ React6.createElement(RefreshCw, { size: 14, className: loading ? "blinko-spin" : "" })
+  )), /* @__PURE__ */ React6.createElement("div", { className: "blinko-search-wrapper" }, /* @__PURE__ */ React6.createElement(
     "input",
     {
       type: "text",
@@ -24521,7 +24650,7 @@ var App3 = ({ plugin }) => {
 
 // src/view.ts
 var BLINKO_VIEW_TYPE = "blinko-view";
-var BlinkoView = class extends import_obsidian5.ItemView {
+var BlinkoView = class extends import_obsidian6.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -24553,7 +24682,7 @@ var BlinkoView = class extends import_obsidian5.ItemView {
 };
 
 // src/main.ts
-var BlinkoSyncPlugin = class extends import_obsidian6.Plugin {
+var BlinkoSyncPlugin = class extends import_obsidian7.Plugin {
   async onload() {
     await this.loadSettings();
     this.registerView(

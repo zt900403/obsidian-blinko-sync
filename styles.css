@@ -234,7 +234,7 @@
   justify-content: space-between;
   padding: 0;
 }
-.blinko-title-dropdown { font-size: 1.1em; font-weight: 700; color: #333; }
+.blinko-title-dropdown { font-size: 1.1em; font-weight: 700; color: #333; display: flex; align-items: center; }
 
 .blinko-search-wrapper {
   position: relative;

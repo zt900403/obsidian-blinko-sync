@@ -62,6 +62,37 @@ export class BlinkoSync {
     }
   }
 
+  async forceSync(allNotes: BlinkoNote[]) {
+    if (!this.syncFolder || !this.syncFolder.trim()) return;
+    try {
+      await this.ensureFolderExists(this.syncFolder);
+      const folderPath = normalizePath(this.syncFolder);
+      const folder = this.app.vault.getAbstractFileByPath(folderPath);
+      
+      if (folder && folder instanceof TFolder) {
+        const validIds = new Set(allNotes.map(n => n.id));
+        
+        for (const file of folder.children) {
+          if (file instanceof TFile && file.extension === 'md') {
+            const match = file.name.match(/^(\d+)(?:-|\.md$)/);
+            if (match) {
+              const fileId = parseInt(match[1], 10);
+              if (!validIds.has(fileId)) {
+                await this.app.vault.delete(file);
+              }
+            }
+          }
+        }
+      }
+      
+      for (const note of allNotes) {
+        await this.syncNote(note);
+      }
+    } catch(e) {
+      console.error("Force sync error:", e);
+    }
+  }
+
   async deleteSyncedNote(id: number) {
     if (!this.syncFolder || !this.syncFolder.trim()) return;
     try {

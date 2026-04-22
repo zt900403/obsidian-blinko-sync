@@ -57,6 +57,50 @@ export class BlinkoAPI {
     }
   }
 
+  async fetchAllNotes(): Promise<BlinkoNote[]> {
+    if (!this.settings.blinkoUrl || !this.settings.blinkoToken) {
+      throw new Error("Please configure Blinko API URL and Token in settings.");
+    }
+    
+    let allNotes: BlinkoNote[] = [];
+    let page = 1;
+    const size = 500;
+    
+    try {
+      while (true) {
+        const response = await requestUrl({
+          url: `${this.getBaseUrl()}/api/v1/note/list`,
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ page, size, orderBy: "desc" })
+        });
+        
+        if (response.status >= 400) {
+          throw new Error(`Failed to fetch notes: ${response.status}`);
+        }
+
+        const data = response.json;
+        let items: BlinkoNote[] = [];
+        
+        if (Array.isArray(data)) {
+          items = data as BlinkoNote[];
+        } else if (data && Array.isArray(data.items)) {
+          items = data.items as BlinkoNote[];
+        }
+        
+        allNotes = [...allNotes, ...items];
+        
+        if (items.length < size) {
+          break; // Last page
+        }
+        page++;
+      }
+      return allNotes;
+    } catch (e: any) {
+      throw new Error(`Fetch Error: ${e.message}`);
+    }
+  }
+
   async createNote(content: string, type: number = 0, id?: number): Promise<void> {
     try {
       const body: any = { content, type };
