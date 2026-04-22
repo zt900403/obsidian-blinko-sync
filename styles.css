@@ -167,9 +167,11 @@
   color: #555;
   margin-bottom: 2px;
   transition: all 0.2s;
+  position: relative;
+  z-index: 1; /* Keep above the vertical line */
 }
-.blinko-tag-item:hover { background-color: #f0f0f0; } /* Subtle hover */
-.blinko-tag-item.active { background-color: #4cdb85; color: white; }
+.blinko-tag-item:hover { background-color: #f0f0f0; } 
+.blinko-tag-item.active { background-color: #4cdb85 !important; color: white; }
 .blinko-tag-item.active .hash, .blinko-tag-item.active .blinko-tag-count { color: rgba(255,255,255,0.8); }
 .blinko-tag-item .hash { color: #333; font-weight: bold; margin-right: 6px; }
 .blinko-tag-count { font-size: 0.85em; color: #aaa; margin-left: auto; }
@@ -181,7 +183,7 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background-color: #eaeaec;
+  background-color: transparent; /* Remove white line entirely as requested */
 }
 
 /* ==========================================================================
@@ -275,18 +277,18 @@
   width: 100%;
   min-height: 150px;
 }
-
 .blinko-textarea-flomo {
   width: 100%;
   border: none;
-  padding: 20px;
+  padding: 16px;
   font-size: 1.05em;
   line-height: 1.6;
   min-height: 150px;
   resize: none;
   outline: none;
   background: transparent;
-  color: #333 !important;
+  color: var(--text-normal) !important;
+  caret-color: var(--text-normal);
   position: relative;
   z-index: 10;
   white-space: pre-wrap;
