@@ -1,16 +1,23 @@
 import { App, normalizePath, TFolder, TFile } from 'obsidian';
 import { BlinkoNote } from './api';
+import { BlinkoSyncSettings } from './settings';
 
 export class BlinkoSync {
-  constructor(private app: App, private syncFolder: string) {}
+  constructor(private app: App, private settings: BlinkoSyncSettings) {}
 
   private async ensureFolderExists(folderPath: string) {
     const normalizedPath = normalizePath(folderPath);
-    const folder = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (!folder) {
-      await this.app.vault.createFolder(normalizedPath);
-    } else if (!(folder instanceof TFolder)) {
-      throw new Error(`Path ${normalizedPath} exists but is not a folder.`);
+    const parts = normalizedPath.split('/');
+    let currentPath = '';
+    
+    for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const folder = this.app.vault.getAbstractFileByPath(currentPath);
+      if (!folder) {
+        await this.app.vault.createFolder(currentPath);
+      } else if (!(folder instanceof TFolder)) {
+        throw new Error(`Path ${currentPath} exists but is not a folder.`);
+      }
     }
   }
 
@@ -21,13 +28,21 @@ export class BlinkoSync {
   }
 
   private async findExistingFile(id: number): Promise<TFile | null> {
-    const folderPath = normalizePath(this.syncFolder);
+    const folderPath = normalizePath(this.settings.syncFolder);
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
     if (folder && folder instanceof TFolder) {
-      for (const file of folder.children) {
-        if (file instanceof TFile && file.extension === 'md') {
-          if (file.name === `${id}.md` || file.name.startsWith(`${id}-`)) {
-            return file;
+      const files: TFile[] = [];
+      const stack: TFolder[] = [folder];
+      
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        for (const child of current.children) {
+          if (child instanceof TFile && child.extension === 'md') {
+            if (child.name === `${id}.md` || child.name.startsWith(`${id}-`)) {
+              return child;
+            }
+          } else if (child instanceof TFolder) {
+            stack.push(child);
           }
         }
       }
@@ -36,14 +51,21 @@ export class BlinkoSync {
   }
 
   async syncNote(note: BlinkoNote) {
-    if (!this.syncFolder || !this.syncFolder.trim()) return;
+    const syncFolder = this.settings.syncFolder;
+    if (!syncFolder || !syncFolder.trim()) return;
     
     try {
-      await this.ensureFolderExists(this.syncFolder);
+      let targetFolder = syncFolder;
+      if (this.settings.groupByDate && note.createdAt) {
+        const dateStr = note.createdAt.split('T')[0];
+        targetFolder = `${syncFolder}/${dateStr}`;
+      }
+      
+      await this.ensureFolderExists(targetFolder);
       
       const title = this.extractTitle(note.content);
       const newFileName = `${note.id}-${title}.md`;
-      const newFilePath = normalizePath(`${this.syncFolder}/${newFileName}`);
+      const newFilePath = normalizePath(`${targetFolder}/${newFileName}`);
       
       const contentStr = `---\nid: ${note.id}\ncreated: ${note.createdAt || new Date().toISOString()}\n---\n\n${note.content}`;
 
@@ -63,23 +85,30 @@ export class BlinkoSync {
   }
 
   async forceSync(allNotes: BlinkoNote[]) {
-    if (!this.syncFolder || !this.syncFolder.trim()) return;
+    const syncFolder = this.settings.syncFolder;
+    if (!syncFolder || !syncFolder.trim()) return;
     try {
-      await this.ensureFolderExists(this.syncFolder);
-      const folderPath = normalizePath(this.syncFolder);
+      await this.ensureFolderExists(syncFolder);
+      const folderPath = normalizePath(syncFolder);
       const folder = this.app.vault.getAbstractFileByPath(folderPath);
       
       if (folder && folder instanceof TFolder) {
         const validIds = new Set(allNotes.map(n => n.id));
+        const stack: TFolder[] = [folder];
         
-        for (const file of folder.children) {
-          if (file instanceof TFile && file.extension === 'md') {
-            const match = file.name.match(/^(\d+)(?:-|\.md$)/);
-            if (match) {
-              const fileId = parseInt(match[1], 10);
-              if (!validIds.has(fileId)) {
-                await this.app.vault.delete(file);
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          for (const child of current.children) {
+            if (child instanceof TFile && child.extension === 'md') {
+              const match = child.name.match(/^(\d+)(?:-|\.md$)/);
+              if (match) {
+                const fileId = parseInt(match[1], 10);
+                if (!validIds.has(fileId)) {
+                  await this.app.vault.delete(child);
+                }
               }
+            } else if (child instanceof TFolder) {
+              stack.push(child);
             }
           }
         }
@@ -94,7 +123,7 @@ export class BlinkoSync {
   }
 
   async deleteSyncedNote(id: number) {
-    if (!this.syncFolder || !this.syncFolder.trim()) return;
+    if (!this.settings.syncFolder || !this.settings.syncFolder.trim()) return;
     try {
       const existingFile = await this.findExistingFile(id);
       if (existingFile) {

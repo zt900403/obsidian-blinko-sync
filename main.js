@@ -23575,7 +23575,8 @@ var DEFAULT_SETTINGS = {
   blinkoUrl: "http://localhost:3000",
   blinkoToken: "",
   syncFolder: "Blinko Notes",
-  username: "Blinko"
+  username: "Blinko",
+  groupByDate: false
 };
 var BlinkoSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -23603,6 +23604,10 @@ var BlinkoSettingTab = class extends import_obsidian.PluginSettingTab {
     });
     new import_obsidian.Setting(containerEl).setName("Local Sync Folder").setDesc("The folder in your Obsidian vault where notes will be synced.").addText((text) => text.setPlaceholder("Blinko Notes").setValue(this.plugin.settings.syncFolder).onChange(async (value) => {
       this.plugin.settings.syncFolder = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Group by Date").setDesc("Whether to organize notes into subfolders based on their creation date (YYYY-MM-DD).").addToggle((toggle) => toggle.setValue(this.plugin.settings.groupByDate).onChange(async (value) => {
+      this.plugin.settings.groupByDate = value;
       await this.plugin.saveSettings();
     }));
   }
@@ -23737,17 +23742,22 @@ var BlinkoAPI = class {
 // src/sync.ts
 var import_obsidian3 = require("obsidian");
 var BlinkoSync = class {
-  constructor(app, syncFolder) {
+  constructor(app, settings) {
     this.app = app;
-    this.syncFolder = syncFolder;
+    this.settings = settings;
   }
   async ensureFolderExists(folderPath) {
     const normalizedPath = (0, import_obsidian3.normalizePath)(folderPath);
-    const folder = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (!folder) {
-      await this.app.vault.createFolder(normalizedPath);
-    } else if (!(folder instanceof import_obsidian3.TFolder)) {
-      throw new Error(`Path ${normalizedPath} exists but is not a folder.`);
+    const parts = normalizedPath.split("/");
+    let currentPath = "";
+    for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const folder = this.app.vault.getAbstractFileByPath(currentPath);
+      if (!folder) {
+        await this.app.vault.createFolder(currentPath);
+      } else if (!(folder instanceof import_obsidian3.TFolder)) {
+        throw new Error(`Path ${currentPath} exists but is not a folder.`);
+      }
     }
   }
   extractTitle(content) {
@@ -23756,13 +23766,20 @@ var BlinkoSync = class {
     return sanitized || "Untitled";
   }
   async findExistingFile(id) {
-    const folderPath = (0, import_obsidian3.normalizePath)(this.syncFolder);
+    const folderPath = (0, import_obsidian3.normalizePath)(this.settings.syncFolder);
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
     if (folder && folder instanceof import_obsidian3.TFolder) {
-      for (const file of folder.children) {
-        if (file instanceof import_obsidian3.TFile && file.extension === "md") {
-          if (file.name === `${id}.md` || file.name.startsWith(`${id}-`)) {
-            return file;
+      const files = [];
+      const stack = [folder];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        for (const child of current.children) {
+          if (child instanceof import_obsidian3.TFile && child.extension === "md") {
+            if (child.name === `${id}.md` || child.name.startsWith(`${id}-`)) {
+              return child;
+            }
+          } else if (child instanceof import_obsidian3.TFolder) {
+            stack.push(child);
           }
         }
       }
@@ -23770,13 +23787,19 @@ var BlinkoSync = class {
     return null;
   }
   async syncNote(note) {
-    if (!this.syncFolder || !this.syncFolder.trim())
+    const syncFolder = this.settings.syncFolder;
+    if (!syncFolder || !syncFolder.trim())
       return;
     try {
-      await this.ensureFolderExists(this.syncFolder);
+      let targetFolder = syncFolder;
+      if (this.settings.groupByDate && note.createdAt) {
+        const dateStr = note.createdAt.split("T")[0];
+        targetFolder = `${syncFolder}/${dateStr}`;
+      }
+      await this.ensureFolderExists(targetFolder);
       const title = this.extractTitle(note.content);
       const newFileName = `${note.id}-${title}.md`;
-      const newFilePath = (0, import_obsidian3.normalizePath)(`${this.syncFolder}/${newFileName}`);
+      const newFilePath = (0, import_obsidian3.normalizePath)(`${targetFolder}/${newFileName}`);
       const contentStr = `---
 id: ${note.id}
 created: ${note.createdAt || new Date().toISOString()}
@@ -23797,22 +23820,29 @@ ${note.content}`;
     }
   }
   async forceSync(allNotes) {
-    if (!this.syncFolder || !this.syncFolder.trim())
+    const syncFolder = this.settings.syncFolder;
+    if (!syncFolder || !syncFolder.trim())
       return;
     try {
-      await this.ensureFolderExists(this.syncFolder);
-      const folderPath = (0, import_obsidian3.normalizePath)(this.syncFolder);
+      await this.ensureFolderExists(syncFolder);
+      const folderPath = (0, import_obsidian3.normalizePath)(syncFolder);
       const folder = this.app.vault.getAbstractFileByPath(folderPath);
       if (folder && folder instanceof import_obsidian3.TFolder) {
         const validIds = new Set(allNotes.map((n) => n.id));
-        for (const file of folder.children) {
-          if (file instanceof import_obsidian3.TFile && file.extension === "md") {
-            const match = file.name.match(/^(\d+)(?:-|\.md$)/);
-            if (match) {
-              const fileId = parseInt(match[1], 10);
-              if (!validIds.has(fileId)) {
-                await this.app.vault.delete(file);
+        const stack = [folder];
+        while (stack.length > 0) {
+          const current = stack.pop();
+          for (const child of current.children) {
+            if (child instanceof import_obsidian3.TFile && child.extension === "md") {
+              const match = child.name.match(/^(\d+)(?:-|\.md$)/);
+              if (match) {
+                const fileId = parseInt(match[1], 10);
+                if (!validIds.has(fileId)) {
+                  await this.app.vault.delete(child);
+                }
               }
+            } else if (child instanceof import_obsidian3.TFolder) {
+              stack.push(child);
             }
           }
         }
@@ -23825,7 +23855,7 @@ ${note.content}`;
     }
   }
   async deleteSyncedNote(id) {
-    if (!this.syncFolder || !this.syncFolder.trim())
+    if (!this.settings.syncFolder || !this.settings.syncFolder.trim())
       return;
     try {
       const existingFile = await this.findExistingFile(id);
@@ -24405,7 +24435,7 @@ var MainContent = ({ plugin, notes, onDelete }) => {
     setSaving(true);
     try {
       const api = new BlinkoAPI(plugin.settings);
-      const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+      const sync = new BlinkoSync(plugin.app, plugin.settings);
       await api.createNote(editContent, note.type || 0, note.id);
       note.content = editContent;
       await sync.syncNote(note);
@@ -24530,7 +24560,7 @@ var App3 = ({ plugin }) => {
   const [randomWalkIndices, setRandomWalkIndices] = (0, import_react7.useState)([]);
   const loadNotes = (0, import_react7.useCallback)(async (showLoading = true) => {
     const api = new BlinkoAPI(plugin.settings);
-    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    const sync = new BlinkoSync(plugin.app, plugin.settings);
     if (showLoading)
       setLoading(true);
     setError(null);
@@ -24549,7 +24579,7 @@ var App3 = ({ plugin }) => {
   }, [plugin]);
   const forceSyncNotes = async () => {
     const api = new BlinkoAPI(plugin.settings);
-    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    const sync = new BlinkoSync(plugin.app, plugin.settings);
     setLoading(true);
     setError(null);
     new import_obsidian5.Notice("\u5F00\u59CB\u53CC\u5411\u540C\u6B65 (Fetching all notes...)");
@@ -24615,7 +24645,7 @@ var App3 = ({ plugin }) => {
   };
   const handleDeleteNote = async (id) => {
     const api = new BlinkoAPI(plugin.settings);
-    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    const sync = new BlinkoSync(plugin.app, plugin.settings);
     try {
       await api.deleteNote(id);
       setNotes(notes.filter((n) => n.id !== id));

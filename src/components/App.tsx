@@ -26,7 +26,7 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
 
   const loadNotes = useCallback(async (showLoading = true) => {
     const api = new BlinkoAPI(plugin.settings);
-    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    const sync = new BlinkoSync(plugin.app, plugin.settings);
 
     if (showLoading) setLoading(true);
     setError(null);
@@ -45,7 +45,7 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
 
   const forceSyncNotes = async () => {
     const api = new BlinkoAPI(plugin.settings);
-    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    const sync = new BlinkoSync(plugin.app, plugin.settings);
     setLoading(true);
     setError(null);
     new Notice('开始双向同步 (Fetching all notes...)');
@@ -113,7 +113,7 @@ export const App: React.FC<AppProps> = ({ plugin }) => {
 
   const handleDeleteNote = async (id: number) => {
     const api = new BlinkoAPI(plugin.settings);
-    const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+    const sync = new BlinkoSync(plugin.app, plugin.settings);
     try {
       await api.deleteNote(id);
       setNotes(notes.filter(n => n.id !== id));

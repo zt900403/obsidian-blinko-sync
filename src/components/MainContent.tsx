@@ -64,7 +64,7 @@ export const MainContent: React.FC<Props> = ({ plugin, notes, onDelete }) => {
     setSaving(true);
     try {
       const api = new BlinkoAPI(plugin.settings);
-      const sync = new BlinkoSync(plugin.app, plugin.settings.syncFolder);
+      const sync = new BlinkoSync(plugin.app, plugin.settings);
       await api.createNote(editContent, note.type || 0, note.id);
       note.content = editContent;
       await sync.syncNote(note);

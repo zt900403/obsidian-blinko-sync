@@ -6,13 +6,15 @@ export interface BlinkoSyncSettings {
   blinkoToken: string;
   syncFolder: string;
   username: string;
+  groupByDate: boolean;
 }
 
 export const DEFAULT_SETTINGS: BlinkoSyncSettings = {
   blinkoUrl: 'http://localhost:3000',
   blinkoToken: '',
   syncFolder: 'Blinko Notes',
-  username: 'Blinko'
+  username: 'Blinko',
+  groupByDate: false
 }
 
 export class BlinkoSettingTab extends PluginSettingTab {
@@ -72,6 +74,16 @@ export class BlinkoSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.syncFolder)
         .onChange(async (value) => {
           this.plugin.settings.syncFolder = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Group by Date')
+      .setDesc('Whether to organize notes into subfolders based on their creation date (YYYY-MM-DD).')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.groupByDate)
+        .onChange(async (value) => {
+          this.plugin.settings.groupByDate = value;
           await this.plugin.saveSettings();
         }));
   }
