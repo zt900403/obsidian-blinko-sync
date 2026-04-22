@@ -24317,15 +24317,41 @@ var MarkdownViewer = ({ content, plugin }) => {
       const comp = new import_obsidian4.Component();
       const baseUrl = plugin.settings.blinkoUrl.replace(/\/+$/, "");
       const modifiedContent = content.replace(/\]\(\/api\/file\//g, `](${baseUrl}/api/file/`).replace(/src="\/api\/file\//g, `src="${baseUrl}/api/file/`);
+      const objectUrls = [];
       import_obsidian4.MarkdownRenderer.render(
         plugin.app,
         modifiedContent,
         containerRef.current,
         "",
         comp
-      );
+      ).then(() => {
+        if (!containerRef.current)
+          return;
+        const images = containerRef.current.querySelectorAll("img");
+        images.forEach(async (img) => {
+          const src = img.getAttribute("src");
+          if (src && src.startsWith(baseUrl + "/api/file/")) {
+            try {
+              const res = await (0, import_obsidian4.requestUrl)({
+                url: src,
+                method: "GET",
+                headers: {
+                  "Authorization": `Bearer ${plugin.settings.blinkoToken}`
+                }
+              });
+              const blob = new Blob([res.arrayBuffer], { type: res.headers["content-type"] || "image/png" });
+              const objectUrl = URL.createObjectURL(blob);
+              objectUrls.push(objectUrl);
+              img.src = objectUrl;
+            } catch (e) {
+              console.error("Failed to load Blinko image:", e);
+            }
+          }
+        });
+      });
       return () => {
         comp.unload();
+        objectUrls.forEach(URL.revokeObjectURL);
       };
     }
   }, [content, plugin]);
