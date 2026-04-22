@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-blinko-sync",
+  "name": "Blinko Sync",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Thino-like timeline UI synced with a self-hosted Blinko server.",
+  "author": "Gemini",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
